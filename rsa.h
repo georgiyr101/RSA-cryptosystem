@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
-#include <locale.h>
 
 typedef struct {
     long long e;
@@ -62,16 +61,16 @@ int isPrime(long long n) {
 long long getLongNumber() {
     long long n;
     while (1) {
-        printf("Введите число: ");
+        printf("Enter number: ");
         if (scanf_s("%lld", &n) == 1) {
             if (getchar() != '\n') {
-                printf("Ошибка: введите одно число!\n");
+                printf("Error!\n");
                 while (getchar() != '\n');
             }
             else return n;
         }
         else {
-            printf("Ошибка: введите корректное число!\n");
+            printf("Error!\n");
             while (getchar() != '\n');
         }
     }
@@ -80,10 +79,10 @@ long long getLongNumber() {
 long long getPrime(const char* prompt) {
     long long num;
     do {
-        printf("Введите простое число %s: ", prompt);
+        printf("Enter prime number %s: ", prompt);
         num = getLongNumber();
         if (!isPrime(num))
-            printf("Число %s не является простым. Попробуйте снова.\n", prompt);
+            printf("Number %s is not prime. Try again.\n", prompt);
     } while (!isPrime(num));
     return num;
 }
