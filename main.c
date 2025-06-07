@@ -1,58 +1,129 @@
 #include "rsa.h"
 
 int main() {
+    setlocale(LC_ALL, "Russian");
 
-	setlocale(LC_ALL, "russian");
-	long long p = getPrime("p");
-	long long q = getPrime("q");
-	printf("Вы ввели два простых числа: p = %lld, q = %lld\n", p, q);
-	long long n = p * q;
-	long long phi = (p - 1) * (q - 1);
-	long long e = chooseE(phi);
-	if (e == -1) {
-		printf("Ошибка: не удалось выбрать e\n");
-	}
-	else {
-		printf("Выбранное значение e: %lld\n", e);
-	}
-	long long d = modInverse(e, phi);
-	if (d == -1) {
-		printf("Ошибка: не удалось найти обратный элемент для e\n");
-	}
-	else {
-		printf("Закрытая экспонента d: %lld\n", d);
-	}
-	printf("\n--- Ключи RSA ---\n");
-	printf("Открытый ключ (e, n): (%lld, %lld)\n", e, n);
-	printf("Закрытый ключ (d, n): (%lld, %lld)\n", d, n);
+    User user;
+    RSAContext ctx;
+    PublicKey pub;
+    PrivateKey priv;
+    int choice;
+    int keysInitialized = 0;
 
-	long long message = getLongNumber(); 
-	long long cipher = encrypt(message, e, n);
-	printf("Зашифрованное сообщение: %lld\n", cipher);
-	long long decrypted = decrypt(cipher, d, n);
-	printf("Расшифрованное сообщение: %lld\n", decrypted);
+    char msg[1024];
+    long long cipher[1024];
+    char decrypted[1024];
+    int cipherLen;
 
-	char plaintext[256];
-	printf("Введите текст для шифрования: ");
-	fgets(plaintext, sizeof(plaintext), stdin);
-	plaintext[strcspn(plaintext, "\n")] = 0; 
+    printf("1 — Регистрация\n2 — Вход\nВыберите: ");
+    scanf_s("%d", &choice);
+    getchar();
 
-	int ciphertextLength = 0;
-	long long ciphertext[256];
-	encryptText(plaintext, e, n, ciphertext, &ciphertextLength);
+    char username[50];
+    printf("Введите имя пользователя: ");
+    fgets(username, sizeof(username), stdin);
+    username[my_strcspn(username, "\n")] = '\0';
+    initUser(&user, username);
 
-	if (ciphertextLength > 0) {
-		printf("Зашифрованное сообщение (числа): ");
-		for (int i = 0; i < ciphertextLength; i++) {
-			printf("%lld ", ciphertext[i]);
-		}
-		printf("\n");
+    if (choice == 1) {
+        registerUser(&user);
+    }
+    else if (choice == 2) {
+        if (!loginUser(&user, &pub, &priv)) return 1;
+        keysInitialized = 1;
+    }
+    else {
+        printf("Неверный выбор.\n");
+        return 1;
+    }
 
-		char decryptedText[256];
-		decryptText(ciphertext, ciphertextLength, d, n, decryptedText);
-		printf("Расшифрованное сообщение: %s\n", decryptedText);
-	}
-	return 0;
+    printf("\n--- Работа с ключами ---\n");
+    printf("1. Сгенерировать новые ключи\n");
+    printf("2. Загрузить ключи из файла\n");
+    printf("Выберите: ");
+    scanf_s("%d", &choice);
+    getchar();
+
+    if (choice == 1) {
+        generateRSA(&ctx);
+        pub = ctx.pub;
+        priv = ctx.priv;
+        saveKeysToFile(pub, priv, user.pubKeyFile, user.privKeyFile);
+        keysInitialized = 1;
+        printf("Ключи успешно сгенерированы и сохранены.\n");
+        printf("Открытый ключ: (e = %lld, n = %lld)\n", pub.e, pub.n);
+        printf("Закрытый ключ: (d = %lld, n = %lld)\n", priv.d, priv.n);
+    }
+    else if (choice == 2) {
+        if (loadKeysFromFile(&pub, &priv, user.pubKeyFile, user.privKeyFile)) {
+            keysInitialized = 1;
+            printf("Ключи успешно загружены.\n");
+        }
+        else {
+            printf("Ошибка загрузки ключей.\n");
+        }
+    }
+    else {
+        printf("Неверный выбор.\n");
+        return 1;
+    }
+    printf("\n--- RSA Меню ---\n");
+    printf("1. Зашифровать сообщение\n");
+    printf("2. Расшифровать сообщение\n");
+    printf("3. Выход\n");
+    do {
+        
+        printf("Ваш выбор: ");
+        scanf_s("%d", &choice);
+        getchar();
+
+        switch (choice) {
+        case 1:
+            if (!keysInitialized) {
+                printf("Ключи не инициализированы.\n");
+                break;
+            }
+            printf("Введите сообщение для шифрования: ");
+            fgets(msg, sizeof(msg), stdin);
+            msg[my_strcspn(msg, "\n")] = '\0';
+            encryptText(msg, pub, cipher, &cipherLen);
+            printf("Зашифрованное сообщение: ");
+            for (int i = 0; i < cipherLen; i++) printf("%lld ", cipher[i]);
+            printf("\n");
+            break;
+
+        case 2:
+            if (!keysInitialized) {
+                printf("Ключи не инициализированы.\n");
+                break;
+            }
+            printf("Введите зашифрованные числа через пробел (в конце — 0):\n");
+            cipherLen = 0;
+            while (1) {
+                long long value;
+                if (scanf_s("%lld", &value) != 1) {
+                    printf("Ошибка ввода!\n");
+                    while (getchar() != '\n');
+                    break;
+                }
+                if (value == 0) break;
+                cipher[cipherLen++] = value;
+            }
+            getchar();
+            decryptText(cipher, cipherLen, priv, decrypted);
+            printf("Расшифрованное сообщение: %s\n", decrypted);
+            break;
+
+        case 3:
+            printf("Выход...\n");
+            break;
+
+        default:
+            printf("Неверный выбор.\n");
+        }
+
+    } while (choice != 3);
+
+    return 0;
 }
-
 
